@@ -66,10 +66,10 @@
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from ultralytics import YOLO
 from PIL import Image
 import io
 import base64
+import os
 
 app = FastAPI()
 
@@ -82,16 +82,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load YOLO Model
-model = YOLO("objectdetection.pt")
-model.fuse()
-
 @app.get("/")
 def read_root():
     return {"message": "API Deteksi Buah Siap!"}
 
+
+def load_model():
+    # 🔥 IMPORT YOLO DI SINI, BUKAN DI ATAS
+    from ultralytics import YOLO
+
+    model = YOLO("objectdetection.pt")
+    model.fuse()
+    return model
+
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    # Load model saat dibutuhkan
+    model = load_model()
+
     # Read image
     image_bytes = await file.read()
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
