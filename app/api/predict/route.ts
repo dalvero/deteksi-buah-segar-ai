@@ -1,93 +1,54 @@
+// File: app/api/predict/route.ts
+// Install dulu: npm install @gradio/client
+
 import { NextResponse } from 'next/server';
+import { Client } from "@gradio/client";
 
 export async function POST(request: Request) {
   try {
     const { image } = await request.json();
     
-    // Ubah base64 ke blob
+    // Konversi base64 ke Blob
     const base64Data = image.split(',')[1];
-    const blob = Buffer.from(base64Data, 'base64');
-
-    // Endpoint Gradio yang benar
-    const HF_SPACE_URL = "https://dalvero-deteksi-buah-ai.hf.space";
+    const mimeType = image.split(',')[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
     
-    // Step 1: Upload file ke Gradio
-    const formData = new FormData();
-    formData.append('files', new Blob([blob], { type: 'image/jpeg' }), 'image.jpg');
+    // Konversi base64 string ke buffer lalu ke Blob
+    const buffer = Buffer.from(base64Data, 'base64');
+    const blob = new Blob([buffer], { type: mimeType });
+
+    console.log('Connecting to Gradio Space...');
     
-    const uploadResponse = await fetch(`${HF_SPACE_URL}/upload`, {
-      method: 'POST',
-      body: formData,
+    // Connect ke Hugging Face Space
+    const client = await Client.connect("dalvero/deteksi-buah-ai");
+    
+    console.log('Sending prediction request...');
+    
+    // Panggil fungsi predict (sesuaikan dengan nama function di Gradio)
+    const result = await client.predict("/predict", { 
+      image: blob 
     });
 
-    if (!uploadResponse.ok) {
-      throw new Error('Upload gagal');
-    }
+    console.log('Result received:', result);
 
-    const uploadData = await uploadResponse.json();
-    const fileUrl = uploadData[0]; // URL file yang di-upload
-
-    // Step 2: Panggil endpoint predict dengan file URL
-    const predictResponse = await fetch(`${HF_SPACE_URL}/call/predict`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: [fileUrl] // Kirim URL file, bukan base64
-      }),
-    });
-
-    if (!predictResponse.ok) {
-      throw new Error('Predict gagal');
-    }
-
-    const predictData = await predictResponse.json();
-    const eventId = predictData.event_id;
-
-    // Step 3: Ambil hasil dari streaming endpoint
-    const resultResponse = await fetch(`${HF_SPACE_URL}/call/predict/${eventId}`, {
-      method: 'GET',
-    });
-
-    // Parse streaming response
-    const reader = resultResponse.body?.getReader();
-    const decoder = new TextDecoder();
-    let result = null;
-
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.output) {
-                result = data.output;
-              }
-            } catch (e) {
-              console.error('Parse error:', e);
-            }
-          }
-        }
-      }
-    }
-
+    // result.data biasanya array [image_output]
     return NextResponse.json({ 
       success: true, 
-      data: result 
+      data: result.data 
     });
 
-  } catch (error) {
-    console.error('Error:', error);
+  } catch (error: any) {
+    console.error('API Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Gagal memproses gambar' },
+      { 
+        success: false, 
+        error: error.message || 'Gagal memproses gambar',
+        details: error.toString()
+      },
       { status: 500 }
     );
   }
 }
+
+// Tambahkan config untuk Next.js
+export const runtime = 'nodejs';
+export const maxDuration = 30; // 30 detik timeout
