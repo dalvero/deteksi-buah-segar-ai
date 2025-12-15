@@ -86,54 +86,6 @@ export default function UploadSection() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!result || !canvasRef.current || !imagePreview) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new Image();
-    img.src = imagePreview;
-
-    img.onload = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-
-      const displayWidth = parent.clientWidth;
-      const scale = displayWidth / img.width;
-      const displayHeight = img.height * scale;
-
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      result.detections.forEach((det: any) => {
-        const [x1, y1, x2, y2] = det.box;
-
-        const sx1 = x1 * scale;
-        const sy1 = y1 * scale;
-        const sw = (x2 - x1) * scale;
-        const sh = (y2 - y1) * scale;
-
-        ctx.strokeStyle = "#10b981";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(sx1, sy1, sw, sh);
-
-        ctx.fillStyle = "#10b981";
-        ctx.font = "14px sans-serif";
-        ctx.fillText(
-          `${det.class} ${(det.confidence * 100).toFixed(1)}%`,
-          sx1,
-          Math.max(sy1 - 6, 14)
-        );
-      });
-    };
-  }, [result, imagePreview]);
-
-
-
   // --- LOGIKA UPLOAD BIASA ---
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0];
@@ -311,16 +263,16 @@ export default function UploadSection() {
             {/* 1. JIKA SUDAH ADA GAMBAR PREVIEW/HASIL */}
             {imagePreview ? (
                <div className="space-y-4 text-center">
-                <div className="relative inline-block w-full max-w-2xl">
-                  <canvas
-                    ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                  />
+                <div className="relative inline-block w-full max-w-2xl">                
                   <img
-                    src={imagePreview}
-                    alt="Preview"
+                    src={
+                      result?.image_base64
+                        ? `data:image/jpeg;base64,${result.image_base64}`
+                        : imagePreview
+                    }
                     className="max-w-full h-auto max-h-[500px] rounded-2xl shadow-xl object-contain mx-auto"
                   />
+
 
                   
                   {result && (
