@@ -161,40 +161,32 @@ export default function UploadSection() {
         reader.readAsDataURL(file);
       });
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/run/predict`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            data: [base64], // ⚠️ HARUS ARRAY
-          }),
-        }
-      );
+      // Panggil API Vercel (BUKAN HF LANGSUNG)
+      const response = await fetch("/api/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: base64 }),
+      });
 
-      if (!response.ok) {
-        throw new Error("Gagal memanggil AI");
-      }
+      if (!response.ok) throw new Error("Gagal memanggil AI");
 
       const data = await response.json();
 
-      /**
-       * Gradio response format:
-       * data.data[0] = image (base64)
-       */
       setResult({
-        image_base64: data.data[0].split(",")[1],
-        detections: [], // optional
+        image_base64: data.data[0].split(",")[1], // hasil gambar
+        detections: [], // Gradio ga kirim box detail
       });
-    } catch (error) {
-      console.error(error);
+
+    } catch (err) {
+      console.error(err);
       alert("Gagal menganalisis gambar");
     } finally {
       setIsAnalyzing(false);
     }
   }
+
 
 
 
