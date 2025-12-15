@@ -147,6 +147,7 @@ export default function UploadSection() {
 
   // HANDLE HUGGING FACE
   async function handleAnalyze() {
+    console.log("API URL:", process.env.NEXT_PUBLIC_AI_API_URL);
     if (!file) return;
 
     setIsAnalyzing(true);
