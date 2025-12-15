@@ -126,10 +126,21 @@ export default function UploadSection() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://localhost:8000/predict", {
-        method: "POST",
-        body: formData,
-      });
+      // LOCAL
+      // const response = await fetch("http://localhost:8000/predict", {
+      //   method: "POST",
+      //   body: formData,
+      // });
+
+      // DEPLOY
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/predict`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
 
       if (!response.ok) {
         throw new Error("Gagal terhubung ke server AI");
