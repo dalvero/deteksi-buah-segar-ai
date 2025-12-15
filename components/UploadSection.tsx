@@ -180,12 +180,14 @@ export default function UploadSection() {
 
       const data = await response.json();
 
-      // data.data[0] = image hasil YOLO (base64)
+      /**
+       * Gradio response format:
+       * data.data[0] = image (base64)
+       */
       setResult({
         image_base64: data.data[0].split(",")[1],
-        detections: [], // optional (bisa kamu tambah nanti)
+        detections: [], // optional
       });
-
     } catch (error) {
       console.error(error);
       alert("Gagal menganalisis gambar");
@@ -193,6 +195,7 @@ export default function UploadSection() {
       setIsAnalyzing(false);
     }
   }
+
 
 
   function handleReset() {
