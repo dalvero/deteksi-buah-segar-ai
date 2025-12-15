@@ -63,55 +63,48 @@
 
 
 # TESTING
-
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
-import io
-import base64
-import os
+from ultralytics import YOLO
+from pathlib import Path
+import io, base64
 
 app = FastAPI()
 
-# CORS (AMAN UNTUK VERCEL + FLUTTER WEBVIEW)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://deteksi-buah-segar-oub7m15yc-dalveros-projects.vercel.app"
     ],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ===============================
+# LOAD MODEL SEKALI SAAT START
+# ===============================
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "objectdetection.pt"
+
+print("🔥 Loading YOLO model...")
+model = YOLO(str(MODEL_PATH))
+model.fuse()
+print("✅ Model ready")
+
 @app.get("/")
-def read_root():
+def root():
     return {"message": "API Deteksi Buah Siap!"}
-
-
-def load_model():
-    # 🔥 IMPORT YOLO DI SINI, BUKAN DI ATAS
-    from ultralytics import YOLO
-
-    model = YOLO("objectdetection.pt")
-    model.fuse()
-    return model
-
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    # Load model saat dibutuhkan
-    model = load_model()
-
-    # Read image
     image_bytes = await file.read()
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    # Inference
     results = model(image)
     result = results[0]
 
-    # Detection data
     detections = []
     for box in result.boxes:
         detections.append({
@@ -120,16 +113,13 @@ async def predict(file: UploadFile = File(...)):
             "box": box.xyxy.tolist()[0]
         })
 
-    # Result image
     im_array = result.plot()
     im_rgb = Image.fromarray(im_array[..., ::-1])
 
-    buffered = io.BytesIO()
-    im_rgb.save(buffered, format="JPEG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    buffer = io.BytesIO()
+    im_rgb.save(buffer, format="JPEG")
 
     return {
-        "filename": file.filename,
         "detections": detections,
-        "image_base64": img_str
+        "image_base64": base64.b64encode(buffer.getvalue()).decode()
     }
