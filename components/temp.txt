@@ -117,82 +117,33 @@ export default function UploadSection() {
   }
 
   // --- LOGIKA ANALISIS LOKAL ---
-  // async function handleAnalyze() {
-  //   if (!file) return;
-
-  //   setIsAnalyzing(true);
-  //   const formData = new FormData();
-  //   formData.append("file", file);
-
-  //   try {
-  //     // LOCAL
-  //     const response = await fetch("http://localhost:8000/predict", {
-  //       method: "POST",
-  //       body: formData,
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error("Gagal terhubung ke server AI");
-  //     }
-
-  //     const data = await response.json();
-  //     setResult(data);
-  //   } catch (error) {
-  //     console.error("Error:", error);
-  //     alert("Gagal mendeteksi. Pastikan backend Python nyala!");
-  //   } finally {
-  //     setIsAnalyzing(false);
-  //   }
-  // }
-
-  // HANDLE HUGGING FACE
   async function handleAnalyze() {
     if (!file) return;
 
     setIsAnalyzing(true);
-
     const formData = new FormData();
     formData.append("file", file);
 
-    // Timeout controller (HF bisa agak lama)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60 detik
-
     try {
-      const response = await fetch(
-        process.env.NEXT_PUBLIC_AI_API_URL as string,
-        {
-          method: "POST",
-          body: formData,
-          signal: controller.signal,
-        }
-      );
+      // LOCAL
+      const response = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        body: formData,
+      });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `AI Server Error (${response.status}): ${errorText}`
-        );
+        throw new Error("Gagal terhubung ke server AI");
       }
 
       const data = await response.json();
       setResult(data);
-
-    } catch (error: any) {
-      console.error("AI Analyze Error:", error);
-
-      if (error.name === "AbortError") {
-        alert("⏱️ Proses terlalu lama. Silakan coba lagi.");
-      } else {
-        alert("❌ Gagal mendeteksi gambar. Silakan coba lagi.");
-      }
-
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Gagal mendeteksi. Pastikan backend Python nyala!");
     } finally {
-      clearTimeout(timeoutId);
       setIsAnalyzing(false);
     }
   }
-
 
   function handleReset() {
     setImagePreview(null);
