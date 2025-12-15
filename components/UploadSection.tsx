@@ -117,44 +117,83 @@ export default function UploadSection() {
     setIsDragging(false);
   }
 
-  // --- LOGIKA ANALISIS ---
+  // --- LOGIKA ANALISIS LOKAL ---
+  // async function handleAnalyze() {
+  //   if (!file) return;
+
+  //   setIsAnalyzing(true);
+  //   const formData = new FormData();
+  //   formData.append("file", file);
+
+  //   try {
+  //     // LOCAL
+  //     const response = await fetch("http://localhost:8000/predict", {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error("Gagal terhubung ke server AI");
+  //     }
+
+  //     const data = await response.json();
+  //     setResult(data);
+  //   } catch (error) {
+  //     console.error("Error:", error);
+  //     alert("Gagal mendeteksi. Pastikan backend Python nyala!");
+  //   } finally {
+  //     setIsAnalyzing(false);
+  //   }
+  // }
+
+  // LOGIKA ANALISIS HUGGING FACE
   async function handleAnalyze() {
     if (!file) return;
 
     setIsAnalyzing(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      // LOCAL
-      // const response = await fetch("http://localhost:8000/predict", {
-      //   method: "POST",
-      //   body: formData,
-      // });
+      // File → base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-      // DEPLOY
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/predict`,
+        `${process.env.NEXT_PUBLIC_API_URL}/run/predict`,
         {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            data: [base64], // ⚠️ HARUS ARRAY
+          }),
         }
       );
 
-
       if (!response.ok) {
-        throw new Error("Gagal terhubung ke server AI");
+        throw new Error("Gagal memanggil AI");
       }
 
       const data = await response.json();
-      setResult(data);
+
+      // data.data[0] = image hasil YOLO (base64)
+      setResult({
+        image_base64: data.data[0].split(",")[1],
+        detections: [], // optional (bisa kamu tambah nanti)
+      });
+
     } catch (error) {
-      console.error("Error:", error);
-      alert("Gagal mendeteksi. Pastikan backend Python nyala!");
+      console.error(error);
+      alert("Gagal menganalisis gambar");
     } finally {
       setIsAnalyzing(false);
     }
   }
+
 
   function handleReset() {
     setImagePreview(null);
