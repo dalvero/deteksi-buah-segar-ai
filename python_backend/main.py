@@ -76,7 +76,9 @@ app = FastAPI()
 # CORS (AMAN UNTUK VERCEL + FLUTTER WEBVIEW)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://deteksi-buah-segar-oub7m15yc-dalveros-projects.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
