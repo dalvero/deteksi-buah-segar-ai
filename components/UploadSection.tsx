@@ -15,7 +15,8 @@ export default function UploadSection() {
 
   // State & Ref untuk Webcam
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);        // untuk bounding box
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null); // khusus webcam
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -52,30 +53,31 @@ export default function UploadSection() {
   };
 
   const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && captureCanvasRef.current) {
       const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Set ukuran canvas sesuai video
+      const canvas = captureCanvasRef.current;
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const capturedFile = new File([blob], "webcam-capture.jpg", { type: "image/jpeg" });
-            setFile(capturedFile);
-            setImagePreview(URL.createObjectURL(capturedFile));
-            stopCamera(); 
-            setResult(null);
-          }
-        }, 'image/jpeg', 0.95);
-      }
+      const context = canvas.getContext("2d");
+      if (!context) return;
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const capturedFile = new File([blob], "webcam-capture.jpg", {
+          type: "image/jpeg",
+        });
+        setFile(capturedFile);
+        setImagePreview(URL.createObjectURL(capturedFile));
+        stopCamera();
+        setResult(null);
+      }, "image/jpeg", 0.95);
     }
   };
+
 
   // Matikan kamera jika komponen di-unmount
   useEffect(() => {
@@ -83,6 +85,54 @@ export default function UploadSection() {
       stopCamera();
     };
   }, []);
+
+  useEffect(() => {
+    if (!result || !canvasRef.current || !imagePreview) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const img = new Image();
+    img.src = imagePreview;
+
+    img.onload = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+
+      const displayWidth = parent.clientWidth;
+      const scale = displayWidth / img.width;
+      const displayHeight = img.height * scale;
+
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      result.detections.forEach((det: any) => {
+        const [x1, y1, x2, y2] = det.box;
+
+        const sx1 = x1 * scale;
+        const sy1 = y1 * scale;
+        const sw = (x2 - x1) * scale;
+        const sh = (y2 - y1) * scale;
+
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(sx1, sy1, sw, sh);
+
+        ctx.fillStyle = "#10b981";
+        ctx.font = "14px sans-serif";
+        ctx.fillText(
+          `${det.class} ${(det.confidence * 100).toFixed(1)}%`,
+          sx1,
+          Math.max(sy1 - 6, 14)
+        );
+      });
+    };
+  }, [result, imagePreview]);
+
+
 
   // --- LOGIKA UPLOAD BIASA ---
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -262,11 +312,16 @@ export default function UploadSection() {
             {imagePreview ? (
                <div className="space-y-4 text-center">
                 <div className="relative inline-block w-full max-w-2xl">
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                  />
                   <img
-                    src={result?.image_base64 ? `data:image/jpeg;base64,${result.image_base64}` : imagePreview}
+                    src={imagePreview}
                     alt="Preview"
                     className="max-w-full h-auto max-h-[500px] rounded-2xl shadow-xl object-contain mx-auto"
                   />
+
                   
                   {result && (
                     <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-teal-200">
@@ -343,7 +398,7 @@ export default function UploadSection() {
                                 className="w-full min-h-[400px] object-cover bg-black"
                             />
                             {/* Hidden canvas for capture */}
-                            <canvas ref={canvasRef} className="hidden" />
+                            <canvas ref={captureCanvasRef} className="hidden" />
                             
                             <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4">
                                 <button
