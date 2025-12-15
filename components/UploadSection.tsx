@@ -15,8 +15,9 @@ export default function UploadSection() {
 
   // State & Ref untuk Webcam
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);        // untuk bounding box
-  const captureCanvasRef = useRef<HTMLCanvasElement>(null); // khusus webcam
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -43,6 +44,68 @@ export default function UploadSection() {
       videoRef.current.play().catch(e => console.log("Play error:", e));
     }
   }, [isCameraActive, stream]);
+
+  // Function untuk menggambar bounding box
+  useEffect(() => {
+    if (result && result.detections && canvasRef.current && imageRef.current) {
+      const canvas = canvasRef.current;
+      const img = imageRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
+
+      // Set canvas size sama dengan gambar
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Hitung scale factor
+      const scaleX = img.width / result.image_size.width;
+      const scaleY = img.height / result.image_size.height;
+
+      // Gambar setiap detection
+      result.detections.forEach((det: any) => {
+        const [x1, y1, x2, y2] = det.box;
+        
+        // Scale coordinates
+        const scaledX = x1 * scaleX;
+        const scaledY = y1 * scaleY;
+        const scaledWidth = (x2 - x1) * scaleX;
+        const scaledHeight = (y2 - y1) * scaleY;
+
+        // Tentukan warna berdasarkan class
+        const isFresh = det.class.includes('fresh');
+        const boxColor = isFresh ? '#10b981' : '#ef4444';
+        const bgColor = isFresh ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+
+        // Gambar background box
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
+
+        // Gambar border box
+        ctx.strokeStyle = boxColor;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
+
+        // Gambar label
+        const label = `${det.class.replace('_', ' ')} ${(det.confidence * 100).toFixed(1)}%`;
+        ctx.font = 'bold 14px sans-serif';
+        
+        const textWidth = ctx.measureText(label).width;
+        const textHeight = 20;
+        
+        // Background label
+        ctx.fillStyle = boxColor;
+        ctx.fillRect(scaledX, scaledY - textHeight - 4, textWidth + 10, textHeight + 4);
+        
+        // Text label
+        ctx.fillStyle = 'white';
+        ctx.fillText(label, scaledX + 5, scaledY - 8);
+      });
+    }
+  }, [result]);
 
   const stopCamera = () => {
     if (stream) {
@@ -262,36 +325,45 @@ export default function UploadSection() {
             
             {/* 1. JIKA SUDAH ADA GAMBAR PREVIEW/HASIL */}
             {imagePreview ? (
-               <div className="space-y-4 text-center">
+              <div className="space-y-4 text-center">
                 <div className="relative inline-block w-full max-w-2xl">                
-                  <img
-                    src={
-                      result?.image_base64
-                        ? `data:image/jpeg;base64,${result.image_base64}`
-                        : imagePreview
-                    }
-                    className="max-w-full h-auto max-h-[500px] rounded-2xl shadow-xl object-contain mx-auto"
-                  />
+                  <div className="relative inline-block">
+                    <img
+                      ref={imageRef}
+                      src={
+                        result?.image_base64
+                          ? `data:image/jpeg;base64,${result.image_base64}`
+                          : imagePreview
+                      }
+                      className="max-w-full h-auto max-h-[500px] rounded-2xl shadow-xl object-contain mx-auto"
+                      onLoad={() => {
+                        if (result && result.detections) {
+                          const event = new Event('resize');
+                          window.dispatchEvent(event);
+                        }
+                      }}
+                    />
+                    
+                    {/* Canvas untuk bounding box */}
+                    {result && result.detections && (
+                      <canvas
+                        ref={canvasRef}
+                        className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                        style={{ mixBlendMode: 'normal' }}
+                      />
+                    )}
 
-
-                  
-                  {result && (
-                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-teal-200">
-                      <span className="text-teal-700 font-bold flex items-center gap-2">
-                        <span>✅</span> Selesai
-                      </span>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleReset}
-                    className="absolute top-4 right-4 w-10 h-10 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg flex items-center justify-center z-10"
-                    title="Hapus / Ulangi"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+                    {/* PINDAHKAN BUTTON KE SINI */}
+                    <button
+                      onClick={handleReset}
+                      className="absolute top-4 right-4 w-10 h-10 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg flex items-center justify-center z-10"
+                      title="Hapus / Ulangi"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 {!result && (
